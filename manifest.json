@@ -1,0 +1,31 @@
+{
+  "name": "Soursop - Digital Detox",
+  "version": "1.0",
+  "manifest_version": 3,
+
+  "description": "Limit the time you spent on distracting sites",
+  "author": "Lahiru Vithanage",
+  "icons": {
+    "16": "images/soursop_16.png",
+    "32": "images/soursop_32.png",
+    "48": "images/soursop_48.png",
+    "128": "images/soursop_128.png"
+  },
+  "incognito": "spanning",
+  "permissions": [
+    "storage",
+    "notifications",
+    "declarativeNetRequest",
+    "tabs",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
+  "host_permissions": ["http://*/*","https://*/*"]
+}
