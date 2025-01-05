@@ -1,6 +1,29 @@
 import { REDIRECT_URL, STATUS } from '../common/constants.js';
 import { getBaseUrl, getBlockMapFromStorage, saveBlockMapToStorage } from '../common/util.js';
 
+/**
+ * Object formats
+ * 
+ * blockMap = {
+ *    <id>: {
+ *        id: <integer id starting from 1>,
+ *        url: <base url>,
+ *        threshold: <minutes in integer>,
+ *        status: <LIVE or EXPIRED>,
+ *        tabs: <array of tab objects>,
+ *        pastCumulativeTime: <time in milliseconds>
+ *    },
+ *    <id_2>: <rule_2>,
+ *    ...
+ * }
+ * 
+ * tab = {
+ *    tabId: <integer>,
+ *    windowId: <integer>,
+ *    openedTime: <time in milliseconds>
+ * }
+ */
+
 
 export const findRuleFromTabId = async (tabId) => {
   const blockMap = await getBlockMapFromStorage();
@@ -8,9 +31,13 @@ export const findRuleFromTabId = async (tabId) => {
 }
 
 
+/**
+ * update pastCumulativeTime for rule and remove the tab rule.tabs array
+ */
 export const handleTabClose = async (tabId) => {
   const currentTime = Date.now();
   const blockMap = await getBlockMapFromStorage();
+
   for (const rule of Object.values(blockMap)) {
     const tabIndex = rule.tabs?.findIndex(tab => tab.tabId === tabId);
     if (tabIndex >= 0) {
@@ -27,19 +54,20 @@ export const handleTabClose = async (tabId) => {
 
 /**
  * only this method has the right to update the rule status to EXPIRED
- * do not update the pastCumulativeTime, it should be done by the daily reset
+ * and update the pastCumulativeTime
  */
 const isRuleExpired = async (rule) => {
   if (rule?.status === STATUS.EXPIRED) {
     return true;
   } else {
-    const tabs = rule?.tabs ? rule.tabs : [];
+    const tabs = rule.tabs ?? [];
     const currentTime = Date.now();
     const threshold = rule.threshold * 60 * 1000;
     const liveCumulativeTime = tabs.reduce((totalTime, tab) => totalTime + (currentTime - tab.openedTime), 0);
     const pastCumulativeTime = rule.pastCumulativeTime ?? 0;
     if ((liveCumulativeTime + pastCumulativeTime) >= threshold) {
       rule.status = STATUS.EXPIRED;
+      rule.pastCumulativeTime = liveCumulativeTime + pastCumulativeTime;
       await saveUpdatedRuleToStorage(rule);
       return true;
     }
@@ -64,7 +92,6 @@ const saveUpdatedRuleToStorage = async (rule) => {
  * redirected tabs will later be removed by the clearnStorage method
  */
 const redirectTab = (tabId) => {
-  //TODO: what happens to the redirected tab after day is resetted ???? should we remove them from the database ??? or is it already handled ???? even if it is handled, we should remove them from the database
   chrome.tabs.update(tabId, { url: REDIRECT_URL }, (tab) => {
     if (chrome.runtime.lastError) {
       console.error(`Error updating tab: ${chrome.runtime.lastError.message}`);
@@ -74,11 +101,11 @@ const redirectTab = (tabId) => {
   });
 }
 
-//TODO: search url/domain and make sure every url is a baseUrl
+
 export const findRuleFromUrl = async (url) => {
   const blockMap = await getBlockMapFromStorage();
   const baseUrl = getBaseUrl(url);
-  return Object.values(blockMap).find(rule => rule.url.includes(baseUrl));
+  return Object.values(blockMap).find(rule => rule.url === baseUrl);
 }
 
 
@@ -99,6 +126,11 @@ const addNewTabToRule = async (rule, tabId, windowId) => {
 };
 
 
+/**
+ * if the rule is expired, redirect the tab
+ * (redirecting only the current tab is enough, others will be redirected by the cleaner scheduler)
+ * if not required, regiser the tab to the rule
+ */
 export const handleNewTabOpen = async (tabId, windowId, rule) => {
   const ruleExpired = await isRuleExpired(rule);
   if (ruleExpired) {
@@ -110,13 +142,17 @@ export const handleNewTabOpen = async (tabId, windowId, rule) => {
 }
 
 
+/**
+ * update pastCumulativeTime for rule and remove corresponding tabs from the rule.tabs array
+ */
 export const handleWindowClose = async (windowId) => {
   const currentTime = Date.now();
   const blockMap = await getBlockMapFromStorage();
 
   for (const rule of Object.values(blockMap)) {
-    const tabsToRemove = rule.tabs?.filter(tab => tab.windowId === windowId) ?? [];
-    const remainingTabs = rule.tabs?.filter(tab => tab.windowId !== windowId) ?? [];
+    const tabs = rule.tabs ?? [];
+    const tabsToRemove = tabs.filter(tab => tab.windowId === windowId) ?? [];
+    const remainingTabs = tabs.filter(tab => tab.windowId !== windowId) ?? [];
     let pastCumulativeTime = rule.pastCumulativeTime ?? 0;
 
     tabsToRemove.forEach(tab => {
@@ -146,20 +182,20 @@ export const handleTabWindowChange = async (tabId, newWindowId) => {
   }
 };
 
-//TODO: handle undfined tabs in a better way
-export const checkForExpiredDomains = () => {
-  getBlockMapFromStorage().then(blockMap => {
-    Object.values(blockMap).forEach(async rule => {
-      const ruleExpired = await isRuleExpired(rule);
-      if (ruleExpired) {
-        console.log("Domain: " + rule.url + " is expired, need to redirect tabs");
-        rule?.tabs?.forEach(tab => {
-          redirectTab(tab.tabId);
-          // what is there is a connection error, or the tab is not redirected for some reason, what should be done then
-        });
-      }
-      await cleanUnnecessaryTabs();
-    });
+
+export const checkForExpiredDomains = async () => {
+  await cleanUnnecessaryTabs();
+
+  const blockMap = await getBlockMapFromStorage();
+  Object.values(blockMap).forEach(async rule => {
+    const ruleExpired = await isRuleExpired(rule);
+    if (ruleExpired) {
+      console.log("Domain: " + rule.url + " is expired, need to redirect tabs");
+      const tabs = rule.tabs ?? [];
+      tabs.forEach(tab => {
+        redirectTab(tab.tabId);
+      });
+    }
   });
 };
 
@@ -167,28 +203,35 @@ export const checkForExpiredDomains = () => {
 /**
  * clean redirected tabs from the storage
  * (and remove any outliers)
- * update only tabs, don't touch pastCumulativeTime or status here
+ * update only tabs array, don't touch pastCumulativeTime or status here
  */
 export const cleanUnnecessaryTabs = async () => {
   const blockMap = await getBlockMapFromStorage();
   for (const rule of Object.values(blockMap)) {
-    const tabs = rule.tabs ?? [];
     if (rule.status === STATUS.EXPIRED) {
-      tabs = []; // race condition here ?????
+      rule.tabs = [];
     }
-    for (const tab of tabs) {
-      chrome.tabs.get(tab.tabId, (tabInfo) => {
-        if (chrome.runtime.lastError) {
-          console.error(`Error retrieving tab: ${chrome.runtime.lastError.message}`);
-          // remove tab from rule data, tab does not exists, but how to check actual error is because of tab not existing
-        } else {
-          console.log(`Tab ID: ${tab.tabId}, URL: ${tabInfo.url}`);
-          // if tabUrl is the rule.tab.url then -> ok, otherwise remove the tab from the rule
-        }
-      });
-    }
+    let tabs = rule.tabs ?? [];
+    tabs = tabs.filter(tab => isTabValidAndExists(tab, rule.url));
   }
   await saveBlockMapToStorage(blockMap);
+};
+
+
+export const isTabValidAndExists = async (tab, baseUrl) => {
+  if (tab?.tabId && tab?.windowId && tab?.openedTime) {
+    try {
+      let tabInfo = await chrome.tabs.get(tab.tabId);
+      const tabBaseUrl = getBaseUrl(tabInfo.url);
+      if (tabBaseUrl === baseUrl) {
+        return true;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  console.log("Something is wrong with the tab: ", tab);
+  return false;
 };
 
 
@@ -204,22 +247,23 @@ export const timeUntilMidnight = () => {
 
 
 /**
- * only this method has the right to reset the rule data
- * (including pastCumulativeTime and status)
+ * only this method has the right to RESET the rule status and pastCumulativeTime
+ * (but they can be upated in other methods)
  */
-export const doPeriodicReset = (metadataStore) => {
+export const doDailyReset = async () => {
   console.log("Performing daily reset...");
-  metadataStore.forEach(metadata => {
-    if (metadata.status === STATUS.EXPIRED) {
-      metadata.status = STATUS.LIVE;
-
-      // just to make sure
-      metadata.tabs = [];
-      metadata.pastCumulativeTime = 0;
+  const blockMap = await getBlockMapFromStorage();
+  Object.values(blockMap).forEach(rule => {
+    if(rule.status === STATUS.EXPIRED) {
+      rule.status = STATUS.LIVE;
+      rule.pastCumulativeTime = 0;
     } else {
       const now = new Date();
-      metadata.tabs.forEach(tab => tab.openedTime = now);
-      metadata.pastCumulativeTime = 0;
+      const tabs = rule.tabs ?? [];
+      tabs.forEach(tab => tab.openedTime = now);
+      rule.pastCumulativeTime = 0;
     }
+    console.log("Rule for domain " + rule.url + " is reset. New rule details: ", rule);
   });
+  await saveBlockMapToStorage(blockMap);
 }

@@ -1,7 +1,8 @@
-import { FIVE_SECONDS } from '../common/constants.js';
+import { CLEANER_INTERVAL } from '../common/constants.js';
 import { getBaseUrl } from '../common/util.js';
 import {
   checkForExpiredDomains,
+  doDailyReset,
   findRuleFromTabId,
   findRuleFromUrl,
   handleNewTabOpen,
@@ -9,6 +10,7 @@ import {
   handleTabWindowChange,
   handleWindowClose
 } from './handlers.js';
+
 
 
 /**
@@ -103,18 +105,18 @@ chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
 setInterval(() => {
   console.log("Performing periodic task...");
   checkForExpiredDomains();
-}, FIVE_SECONDS);
+}, CLEANER_INTERVAL);
 
 
-// /**
-//  * registers a periodic trigger to reset the expired domains at midnight
-//  */
-// setTimeout(() => {
-//   console.log("started the one-time tast to schedule the daily reset...");
-//   setInterval(() => {
-//     doPeriodicReset(metadataStore);
-//   }, ONE_DAY);
-// }, timeUntilMidnight());
+/**
+ * registers a periodic trigger to reset the expired domains at midnight
+ */
+setTimeout(() => {
+  console.log("Started the one-time tast to schedule the daily reset...");
+  setInterval(() => {
+    doDailyReset();
+  }, ONE_DAY);
+}, timeUntilMidnight());
 
 
 

@@ -8,7 +8,7 @@ export const REDIRECT_URL = "https://example.com/";
 const HUNDRED_SECONDS = 1000 * 60 * 60;
 export const THREASHOLD = HUNDRED_SECONDS;
 export const ONE_DAY = 1000 * 60 * 60 * 24;
-export const FIVE_SECONDS = 1000 * 15;
+export const CLEANER_INTERVAL = 1000 * 15;
 
 export const COLORS = {
   BACKGROUND: '#f0f0f0',
