@@ -1,14 +1,13 @@
 import { CLEANER_INTERVAL } from '../common/constants.js';
 import { getBaseUrl } from '../common/util.js';
 import {
-  checkForExpiredDomains,
-  doDailyReset,
+  cleanerScheduler,
   findRuleFromTabId,
   findRuleFromUrl,
   handleNewTabOpen,
   handleTabClose,
   handleTabWindowChange,
-  handleWindowClose
+  handleWindowClose,
 } from './handlers.js';
 
 
@@ -104,19 +103,19 @@ chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
  */
 setInterval(() => {
   console.log("Performing periodic task...");
-  checkForExpiredDomains();
+  cleanerScheduler();
 }, CLEANER_INTERVAL);
 
 
-/**
- * registers a periodic trigger to reset the expired domains at midnight
- */
-setTimeout(() => {
-  console.log("Started the one-time tast to schedule the daily reset...");
-  setInterval(() => {
-    doDailyReset();
-  }, ONE_DAY);
-}, timeUntilMidnight());
+// /**
+//  * registers a periodic trigger to reset the expired domains at midnight
+//  */
+// setTimeout(() => {
+//   console.log("Started the one-time tast to schedule the daily reset...");
+//   setInterval(() => {
+//     doDailyReset();
+//   }, ONE_DAY);
+// }, timeUntilMidnight());
 
 
 
