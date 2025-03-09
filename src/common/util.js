@@ -23,6 +23,17 @@ export const getBaseUrl = (url) => {
     const parsedUrl = new URL(url);
     return parsedUrl.origin;
   } catch (error) {
+    console.error('Invalid URL:', error);
+    return url;
+  }
+};
+
+export const getHostFromUrl = (url) => {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.host;
+  } catch (error) {
+    console.error('Invalid URL:', error);
     return url;
   }
 };

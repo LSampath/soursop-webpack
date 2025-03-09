@@ -5,8 +5,8 @@ import { Button, Container, Grid2, IconButton, Paper, Table, TableBody, TableCel
 import React, { useEffect, useState } from 'react';
 import { getBlockMapFromStorage, resetBlockMapForDev } from '../../common/util';
 import RemoveConfirmationDialog from './removeConfirmationDialog';
-import RuleDialog from './RuleDialog';
 import useSharedData from './useSharedData';
+import RuleDialog from './ruleDialog';
 
 
 const BlockList = () => {
@@ -99,7 +99,6 @@ const BlockList = () => {
           </Grid2>
         </Grid2>
       </Container>
-
 
       <RuleDialog
         dialogOpen={ruleDialogOpen}

@@ -268,7 +268,6 @@ export const doDailyReset = async () => {
     } else {
       rule.lastResetTime = now;
     }
-    console.log("Rule status and time details for domain " + rule.url + " is reset.");
   });
   await saveBlockMapToStorage(blockMap);
 }

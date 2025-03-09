@@ -5,8 +5,9 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { COLORS } from '../common/constants';
 import About from './components/about';
 import BlockList from './components/blockList';
-import SidePane from './components/SidePane';
 import theme from './theme';
+import SidePane from './components/sidePane';
+import Usage from './components/usage';
 
 function Settings() {
   return (
@@ -21,6 +22,7 @@ function Settings() {
               <Routes>
                 <Route path="/about" element={<About />} />
                 <Route path="*" element={<BlockList />} />
+                <Route path="/usage" element={<Usage />} />
               </Routes>
             </Grid2>
           </Grid2>

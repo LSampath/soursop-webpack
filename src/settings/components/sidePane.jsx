@@ -45,7 +45,7 @@ const SidePane = () => {
       <Box>
         <Button
           variant="text"
-          disabled
+          onClick={handleNavigationClick('usage')}
           sx={getButtonStyles('/history')}
           startIcon={<BarChartOutlinedIcon />}
         >
